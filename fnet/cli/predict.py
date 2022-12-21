@@ -140,7 +140,9 @@ def save_tif(fname: str, ar: np.ndarray, path_root: str) -> str:
         os.makedirs(path_tif_dir)
         logger.info(f"Created: {path_tif_dir}")
     path_save = os.path.join(path_tif_dir, fname)
-    tifffile.imsave(path_save, ar, compress=2)
+    # change compression level to default
+#     tifffile.imsave(path_save, ar, compress=2)
+    tifffile.imsave(path_save, ar)
     logger.info(f"Saved: {path_save}")
     return os.path.relpath(path_save, path_root)
 
