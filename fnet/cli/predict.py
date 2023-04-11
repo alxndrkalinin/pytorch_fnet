@@ -20,6 +20,7 @@ from fnet.utils.general_utils import files_from_dir
 from fnet.utils.general_utils import retry_if_oserror
 from fnet.utils.general_utils import str_to_object
 
+torch.backends.cudnn.enabled = True
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ def item_from_dataset(
             target = item[1]
     else:
         signal = item
-        
+
     # crop to the nearest size divisible by 16
     if signal.shape[2] % 16 != 0:
         signal = signal[:,:,signal.shape[2]%16//2:0-signal.shape[2]%16//2,:]
@@ -111,7 +112,7 @@ def item_from_dataset(
     if signal.shape[3] % 16 != 0:
         signal = signal[:,:,:,signal.shape[3]%16//2:0-signal.shape[3]%16//2]
         target = target[:,:,:,target.shape[3]%16//2:0-target.shape[3]%16//2]
-        
+
     return (signal, target)
 
 
