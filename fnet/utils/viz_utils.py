@@ -11,7 +11,7 @@ import pandas as pd
 
 
 logger = logging.getLogger(__name__)
-plt.style.use("seaborn")
+plt.style.use("seaborn-v0_8-colorblind")
 COLORS = matplotlib.rcParams["axes.prop_cycle"].by_key()["color"]
 
 
