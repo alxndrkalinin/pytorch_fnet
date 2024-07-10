@@ -315,7 +315,8 @@ class WMSEDiceLoss(torch.nn.Module):
 
     def tune_sigm(self, x, k=-0.95):
         denominator = k - 2 * k * torch.abs(x) + 1
-        return (x - k * x) / denominator.clamp(min=torch.finfo(torch.float32).eps)
+        result = (x - k * x) / denominator.clamp(min=torch.finfo(torch.float32).eps)
+        return (result + 1) / 2
 
     def forward(
         self,
