@@ -52,5 +52,4 @@ class WeightedMSE(torch.nn.Module):
         """
         if weight_map_batch is None:
             return torch.nn.functional.mse_loss(y_hat_batch, y_batch)
-        dim = tuple(range(1, len(weight_map_batch.size())))
-        return (weight_map_batch * (y_hat_batch - y_batch) ** 2).sum(dim=dim).mean()
+        return (weight_map_batch * (y_hat_batch - y_batch) ** 2).mean()
