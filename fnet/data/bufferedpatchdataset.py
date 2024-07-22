@@ -38,12 +38,14 @@ class BufferedPatchDataset:
         buffer_size: int = 1,
         buffer_switch_interval: int = -1,
         shuffle_images: bool = True,
+        nonzero_min: float = 0.0,
     ):
         self.dataset = dataset
         self.patch_shape = patch_shape
         self.buffer_size = min(len(self.dataset), buffer_size)
         self.buffer_switch_interval = buffer_switch_interval
         self.shuffle_images = shuffle_images
+        self.nonzero_min = nonzero_min
 
         self.counter = 0
         self.epochs = -1  # incremented to 0 when buffer initially filled
@@ -126,22 +128,28 @@ class BufferedPatchDataset:
         buffer_index = np.random.randint(len(self.buffer))
         datum = self.buffer[buffer_index]
         shape_spatial = datum[0].shape[-nd:]
+
         patch = []
         slices = None
-        for part in datum:
-            if slices is None:
-                starts = np.array(
-                    [
-                        np.random.randint(0, d - p + 1)
-                        for d, p in zip(shape_spatial, self.patch_shape)
-                    ]
-                )
+        for part in datum[::-1]:
+            # sample patch and check if has enough nonzero elements
+            while slices is None:
+                starts = np.array([np.random.randint(0, d - p + 1) for d, p in zip(shape_spatial, self.patch_shape)])
                 ends = starts + np.array(self.patch_shape)
                 slices = tuple(slice(s, e) for s, e in zip(starts, ends))
-            # Pad slices with "slice(None)" if there are non-spatial dimensions
-            slices_pad = (slice(None),) * (len(part.shape) - len(shape_spatial))
-            patch.append(part[slices_pad + slices])
-        return patch
+                # pad slices with "slice(None)" if there are non-spatial dimensions
+                slices_pad = (slice(None),) * (len(part.shape) - len(shape_spatial))
+                part_patch = part[slices_pad + slices]
+
+                # assumes data is (input, target, binary weight map)
+                if (len(datum) == 3) and (self.nonzero_min > 0.0):
+                    assert torch.all((part_patch == 0) | (part_patch == 1)), "Weight map must be binary"
+                    if part_patch.mean() < self.nonzero_min:
+                        slices = None
+            
+            patch.append(part_patch)
+                
+        return patch[::-1]
 
     def get_batch(self, batch_size: int) -> Sequence[torch.Tensor]:
         """Returns a batch of patches.
