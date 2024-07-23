@@ -52,6 +52,12 @@ class BufferedPatchDataset:
         self.buffer = deque()
         self.remaining_to_be_in_buffer = deque()
         self.buffer_history = []
+
+        if len(dataset[0]) == 3:
+            logger.info("Dataset contains weight maps.")
+            if nonzero_min > 0.0:
+                logger.info(f"Sampling patches with min {nonzero_min} nonzero elements.")
+
         for _ in tqdm(range(self.buffer_size), desc="Buffering images"):
             self.insert_new_element_into_buffer()
 
@@ -147,7 +153,7 @@ class BufferedPatchDataset:
                     if part_patch.mean() < self.nonzero_min:
                         slices = None
             
-            patch.append(part_patch)
+            patch.append(part[slices_pad + slices])
                 
         return patch[::-1]
 
