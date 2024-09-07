@@ -21,8 +21,8 @@ from fnet.utils.general_utils import files_from_dir
 from fnet.utils.general_utils import retry_if_oserror
 from fnet.utils.general_utils import str_to_object
 
-from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
-from pytorch_toolbelt.utils.torch_utils import tensor_from_mask_image, to_numpy
+# from pytorch_toolbelt.inference.tiles import ImageSlicer, CudaTileMerger
+# from pytorch_toolbelt.utils.torch_utils import tensor_from_mask_image, to_numpy
 
 torch.backends.cudnn.enabled = True
 
@@ -238,38 +238,38 @@ def load_from_json(args: argparse.Namespace) -> None:
     args.__dict__.update(predict_options)
 
 
-def predict_on_zslice_tiles(model, zimage, tile_size=(512, 512), tile_step=(256, 256)):
+# def predict_on_zslice_tiles(model, zimage, tile_size=(512, 512), tile_step=(256, 256)):
 
-    image = zimage[0, 0, :, :]
-    print(f"Stack shape:{zimage.shape}")
-    print(f"Slice shape:{image.shape}")
+#     image = zimage[0, 0, :, :]
+#     print(f"Stack shape:{zimage.shape}")
+#     print(f"Slice shape:{image.shape}")
 
-    # Cut large image into overlapping tiles
-    tiler = ImageSlicer(image.shape, tile_size=(512, 512), tile_step=(256, 256))
+#     # Cut large image into overlapping tiles
+#     tiler = ImageSlicer(image.shape, tile_size=(512, 512), tile_step=(256, 256))
 
-    print(tiler.crops)
+#     print(tiler.crops)
 
-    # HCW -> CHW. Optionally, do normalization here
-    tiles = [tensor_from_mask_image(tile) for tile in tiler.split(image)]
+#     # HCW -> CHW. Optionally, do normalization here
+#     tiles = [tensor_from_mask_image(tile) for tile in tiler.split(image)]
 
-    # Allocate a CUDA buffer for holding entire mask
-    merger = CudaTileMerger(tiler.target_shape, 1, tiler.weight)
+#     # Allocate a CUDA buffer for holding entire mask
+#     merger = CudaTileMerger(tiler.target_shape, 1, tiler.weight)
 
-    # Run predictions for tiles and accumulate them
-    for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=1, pin_memory=True):
-        #         for x, y, tile_width, tile_height in coords_batch:
-        #             tile = image[y : y + tile_height, x : x + tile_width].copy()
-        tiles_batch = tiles_batch.float().cuda()
-        pred_batch = model(tiles_batch)
+#     # Run predictions for tiles and accumulate them
+#     for tiles_batch, coords_batch in DataLoader(list(zip(tiles, tiler.crops)), batch_size=1, pin_memory=True):
+#         #         for x, y, tile_width, tile_height in coords_batch:
+#         #             tile = image[y : y + tile_height, x : x + tile_width].copy()
+#         tiles_batch = tiles_batch.float().cuda()
+#         pred_batch = model(tiles_batch)
 
-        merger.integrate_batch(pred_batch, coords_batch)
+#         merger.integrate_batch(pred_batch, coords_batch)
 
-    # Normalize accumulated mask and convert back to numpy
-    #     merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype(np.uint8)
-    merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1)
-    merged_mask = tiler.crop_to_orignal_size(merged_mask)
+#     # Normalize accumulated mask and convert back to numpy
+#     #     merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1).astype(np.uint8)
+#     merged_mask = np.moveaxis(to_numpy(merger.merge()), 0, -1)
+#     merged_mask = tiler.crop_to_orignal_size(merged_mask)
 
-    return merged_mask
+#     return merged_mask
 
 
 def add_parser_arguments(parser) -> None:

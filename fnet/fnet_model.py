@@ -11,6 +11,7 @@ from scipy.ndimage import zoom
 import numpy as np
 import tifffile
 import torch
+from torchinfo import summary
 
 from fnet.metrics import corr_coef
 from fnet.predict_piecewise import predict_piecewise as _predict_piecewise_fn
@@ -107,6 +108,10 @@ class Model:
         self.net = str_to_object(self.nn_class)(**self.nn_kwargs)
         if self.init_weights:
             self.net.apply(_weights_init)
+
+        summary(self.net, input_size=(24, 1, 32, 64, 64))
+        print(self.net)
+
         self.net.to(self.device)
         self.optimizer = torch.optim.Adam(
             get_per_param_options(self.net, wd=self.weight_decay),
