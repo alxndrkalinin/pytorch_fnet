@@ -1,8 +1,14 @@
-from typing import Optional
+from typing import Optional, Tuple
 import logging
 
 import numpy as np
 import scipy
+
+from scipy.stats import median_abs_deviation
+
+from morphocell.skimage import util
+from morphocell.preprocessing import get_threshold_otsu
+from morphocell.segmentation.segment_utils import downscale_and_filter
 
 
 logger = logging.getLogger(__name__)
@@ -371,3 +377,83 @@ def norm_around_center(ar: np.ndarray, z_center: Optional[int] = None):
     ar = ar - chunk.mean()
     ar = ar / chunk.std()
     return ar.astype(np.float32)
+
+
+def norm_min_max(
+    ar: np.ndarray,
+    q: Tuple[float, float] = (0.0, 100.0),
+    zero_center: bool = False,
+):
+    """Returns normalized version of input array.
+
+    The array will be normalized from [min, max] to [0, 1] or [-1, 1] linearly
+
+    Parameters
+    ----------
+    ar
+        Input 3d array to be normalized.
+    z_center
+        Deprecated: Z-index of cell centers.
+
+    Returns
+    -------
+    np.ndarray
+       Nomralized array, dtype = float32
+
+    """
+    if ar.ndim != 3:
+        raise ValueError("Input array must be 3d")
+    if ar.shape[0] < 32:
+        raise ValueError("Input array must be at least length 32 in first dimension")
+
+    ar = ar.astype(np.float32)
+    norm_min, norm_max = np.percentile(ar, q=q)
+    if zero_center:
+        ar = 2 * (ar - norm_min) / (norm_max - norm_min) - 1
+    else:
+        ar = (ar - norm_min) / (norm_max - norm_min)
+    return ar
+
+
+def norm_threshold(
+    ar: np.ndarray,
+    threshold: Optional[float] = None,
+    scale: str = "std",
+):
+    """
+    Normalizes array by thresholding and standard deviation.
+
+    Parameters
+    ----------
+    ar
+        Input 3d array to be normalized.
+    threshold
+        Threshold value for normalization.
+    scale
+        Scale factor for normalization.
+
+    Returns
+    -------
+    np.ndarray
+         Nomralized array, dtype = float32
+    """
+    ar = np.squeeze(ar)
+    ar = util.img_as_float32(ar) if not np.issubdtype(ar.dtype, np.floating) else ar
+
+    if ar.ndim != 3:
+        raise ValueError("Input array must be 3d")
+    if ar.shape[0] < 32:
+        raise ValueError("Input array must be at least length 32 in first dimension")
+
+    if threshold is None:
+        threshold = get_threshold_otsu(downscale_and_filter(ar, downscale_factor=1, filter_size=5))
+
+    if scale == "std":
+        scale = ar.std()
+    elif scale == "mad":
+        scale = median_abs_deviation(ar, axis=None, scale="normal")
+    else:
+        raise Exception("scale has to be either std or mad")
+
+    ar = (ar - threshold) / scale
+    return ar.astype(np.float32, copy=False)
