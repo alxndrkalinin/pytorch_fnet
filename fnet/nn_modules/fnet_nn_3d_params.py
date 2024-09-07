@@ -1,16 +1,28 @@
 import torch
+from torch import nn
 
 
 class Net(torch.nn.Module):
-    def __init__(self, depth=4, mult_chan=32, in_channels=1, out_channels=1):
+    def __init__(self, depth=4, mult_chan=32, in_channels=1, out_channels=1, norm=None):
         super().__init__()
         self.depth = depth
         self.mult_chan = mult_chan
         self.in_channels = in_channels
         self.out_channels = out_channels
 
+        if norm == "batch":
+            self.norm = nn.BatchNorm3d
+        elif norm == "instance":
+            self.norm = nn.InstanceNorm3d
+            print(" === Using instance norm === ")
+        elif norm == "layer":
+            self.norm = nn.LayerNorm
+            print(" === Using layer norm === ")
+        else:
+            raise ValueError("norm must be 'batch' or 'instance'")
+
         self.net_recurse = _Net_recurse(
-            n_in_channels=self.in_channels, mult_chan=self.mult_chan, depth_parent=self.depth, depth=self.depth
+            n_in_channels=self.in_channels, mult_chan=self.mult_chan, depth_parent=self.depth, depth=self.depth, norm_fn=self.norm
         )
         self.conv_out = torch.nn.Conv3d(
             self.mult_chan, self.out_channels, kernel_size=3, padding=1
@@ -22,7 +34,7 @@ class Net(torch.nn.Module):
 
 
 class _Net_recurse(torch.nn.Module):
-    def __init__(self, n_in_channels, mult_chan=2, depth_parent=0, depth=0):
+    def __init__(self, n_in_channels, mult_chan=2, depth_parent=0, depth=0, norm_fn=None):
         """Class for recursive definition of U-network.p
 
         Parameters
@@ -39,26 +51,27 @@ class _Net_recurse(torch.nn.Module):
         super().__init__()
 
         self.depth = depth
+        self.norm = norm_fn
 
         if self.depth == depth_parent:
             n_out_channels = mult_chan
         else:
             n_out_channels = n_in_channels * mult_chan
 
-        self.sub_2conv_more = SubNet2Conv(n_in_channels, n_out_channels)
+        self.sub_2conv_more = SubNet2Conv(n_in_channels, n_out_channels, norm_fn=self.norm)
         if depth > 0:
-            self.sub_2conv_less = SubNet2Conv(2 * n_out_channels, n_out_channels)
+            self.sub_2conv_less = SubNet2Conv(2 * n_out_channels, n_out_channels, norm_fn=self.norm)
             self.conv_down = torch.nn.Conv3d(
                 n_out_channels, n_out_channels, 2, stride=2
             )
-            self.bn0 = torch.nn.BatchNorm3d(n_out_channels)
+            self.bn0 = norm_fn(n_out_channels)
             self.relu0 = torch.nn.ReLU(inplace=True)
             self.convt = torch.nn.ConvTranspose3d(
                 2 * n_out_channels, n_out_channels, kernel_size=2, stride=2
             )
-            self.bn1 = torch.nn.BatchNorm3d(n_out_channels)
+            self.bn1 = norm_fn(n_out_channels)
             self.relu1 = torch.nn.ReLU(inplace=True)
-            self.sub_u = _Net_recurse(n_out_channels, mult_chan=2, depth_parent=depth_parent, depth=(depth - 1))
+            self.sub_u = _Net_recurse(n_out_channels, mult_chan=2, depth_parent=depth_parent, depth=(depth - 1), norm_fn=self.norm)
 
     def forward(self, x):
         if self.depth == 0:
@@ -78,13 +91,13 @@ class _Net_recurse(torch.nn.Module):
 
 
 class SubNet2Conv(torch.nn.Module):
-    def __init__(self, n_in, n_out):
+    def __init__(self, n_in, n_out, norm_fn=None):
         super().__init__()
         self.conv1 = torch.nn.Conv3d(n_in, n_out, kernel_size=3, padding=1)
-        self.bn1 = torch.nn.BatchNorm3d(n_out)
+        self.bn1 = norm_fn(n_out)
         self.relu1 = torch.nn.ReLU(inplace=True)
         self.conv2 = torch.nn.Conv3d(n_out, n_out, kernel_size=3, padding=1)
-        self.bn2 = torch.nn.BatchNorm3d(n_out)
+        self.bn2 = norm_fn(n_out)
         self.relu2 = torch.nn.ReLU(inplace=True)
 
     def forward(self, x):
